@@ -11,7 +11,7 @@ executables = [
 ]
 
 setup(name='Walt One',
-      version = '1.0',
+      version = '1.2',
       description = 'A tool for Disney Offers QA used by Wideout/Media Ocean West Coast team',
       options = {'build_exe': build_options},
       executables = executables)

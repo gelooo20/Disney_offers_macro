@@ -1,6 +1,6 @@
 import os
 import xlwings as xw
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Indicate start of process
 print("Start")
@@ -17,7 +17,7 @@ second_book = xw.Book('Disney Creative Scheduling.xlsx')
 third_book = xw.Book('Disney_CreativeQA_Macro[1].xlsm')
 
 # Access the sheets from the workbooks
-scheduling_doc = second_book.sheets['FY24_Disney_Creative']
+scheduling_doc = second_book.sheets['FY25_Disney_Creative']
 reports_sheet = first_book.sheets['reports']
 macro_scheduling_doc = third_book.sheets['GOOGLE DOCS HERE']
 macro_reports = third_book.sheets['CREATIVE CHECK DAILY RPT HERE']
@@ -156,18 +156,25 @@ finally:
 ##########################################################################################
 print("Cleaning the report")
 
+
 def rgb_to_excel_color(r, g, b):
     return (r << 16) + (g << 8) + b
 
 # Define colors for highlighting
 highlight_color_less_than_150 = rgb_to_excel_color(255, 0, 0)  # Red for values less than 150
+highlight_color_yesterday = rgb_to_excel_color(255, 255, 0)  # Yellow for yesterday's date
 
-# Define the RGB color for cells with values less than 150
-r, g, b = 0, 255, 255
-color_rgb = rgb_to_excel_color(r, g, b)
+# Get the current date
+# formatted_date = datetime.now().strftime('%Y%m%d')  # Format date as needed
+file_name = f"{formatted_date}_Creative_QA_Report.xlsx"
 
-# Open the Excel workbook
-output_report = xw.Book(formatted_date + "_Creative_QA_Report.xlsx")
+# Try to open the Excel workbook
+try:
+    output_report = xw.Book(file_name)
+except FileNotFoundError:
+    # Create a new workbook if the file doesn't exist
+    output_report = xw.Book()
+    output_report.save(file_name)  # Save it with the desired name
 
 # Define the sheets
 RemoveRotation = output_report.sheets['Remove From Rotation']
@@ -180,12 +187,38 @@ ManualChecking.range('A1').value = 'The below creatives have multiple end dates 
 # Define the range to search within (e.g., the used range of the sheet)
 used_range = RemoveRotation.range('G3').current_region
 
+# Get yesterday's date in MM/DD/YYYY format
+yesterday_date = (datetime.now() - timedelta(days=1)).date()
+
 # Iterate over each cell in the range
 for cell in used_range:
+    # Skip empty cells
+    if cell.value is None:
+        continue
+
+    # Check if the cell value is numeric (for highlighting)
     if isinstance(cell.value, (int, float)):
         if cell.value <= 150:
-            cell.api.Interior.Color = highlight_color_less_than_or_equal_to_150
-    # If the cell value is greater than 150
+            cell.api.Interior.Color = highlight_color_less_than_150
+    # Check if the cell value is a date
+    elif isinstance(cell.value, (datetime, str)):
+        # If it's a string, try to convert it to a date
+        if isinstance(cell.value, str):
+            try:
+                cell_date = datetime.strptime(cell.value, '%m/%d/%Y').date()
+            except ValueError:
+                continue  # Skip if the date format is incorrect
+        else:
+            cell_date = cell.value.date()  # If it's already a datetime object
+
+        # Highlight corresponding cell in column F if it matches yesterday's date
+        if cell_date == yesterday_date:
+            cell_offset = cell.offset(0, -1)  # Move to the left to column F
+            cell_offset.api.Interior.Color = highlight_color_yesterday
+
+# Save the workbook if needed
+output_report.save()
+# output_report.close()  # Uncomment if you want to close it after saving
 
 print("Report cleaned.")
 
